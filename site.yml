@@ -1,0 +1,13 @@
+---
+- hosts: vncserver
+  user: root
+  roles:
+    - vncserver
+  tags: vncserver
+
+- hosts: zap
+  user: root
+  roles:
+    - vncserver
+    - zap
+  tags: zap

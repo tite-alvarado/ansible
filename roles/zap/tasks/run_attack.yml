@@ -1,0 +1,32 @@
+---
+- name: Strip URL Hostname for report filenames
+  shell: echo {{ url }} | awk -F'/' '{print $3}'
+  register: uh
+
+- name: Register date for report indexing
+  shell: date +%F_%H-%M-%S
+  register: f
+
+- name: Run quickattack asynchronously
+  shell: /usr/share/owasp-zap/zap.sh -daemon -quickurl "{{ url }}" -quickout ~/zap-{{ uh.stdout }}_{{ f.stdout }}.xml 2>&1 1>~/zap-{{ uh.stdout }}_{{ f.stdout}}.attack.log
+  become: yes
+  become_user: "{{ vncuser }}"
+  async: 1200
+  poll: 0
+  register: running_attack
+
+#- name: Show running attack results
+#  debug:
+#    msg: " >>> Waiting for attack to finish. Running attack details \n\n {{ running_attack }}"
+
+- name: Wait for daemon to finish attack - 20 minutes
+  wait_for:
+    path: ~/zap-{{ uh.stdout }}_{{ f.stdout }}.attack.log
+    search_regex: " INFO org.zaproxy.zap.DaemonBootstrap  - ZAP is now listening on "
+    delay: 10
+    timeout: 1200
+  become: yes
+  become_user: "{{ vncuser }}"
+
+- name: End attack daemon
+  shell: pkill -TERM -e -f zap.*

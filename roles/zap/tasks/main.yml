@@ -1,0 +1,18 @@
+# Install ZAP from Cabelo repo for CentOS7
+---
+  - include_role:
+      name: common
+      tasks_from: install_libselinuxpython.yml
+
+  - name: "copy cabelo repository"
+    copy: src=../files/cabelo.repo dest=/etc/yum.repos.d/cabelo.repo owner=root group=root
+    # register: repository_existed
+
+  - name: "install ZAP"
+    yum: name={{ item }} state=latest
+    with_items:
+    - owasp-zap
+
+  - name: "Run quick attacks if any URL is given"
+    when: url is defined
+    include_tasks: run_attack.yml

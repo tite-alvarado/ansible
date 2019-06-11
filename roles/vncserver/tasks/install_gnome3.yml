@@ -1,0 +1,10 @@
+# Install gnome3 desktop
+  - name: "install gnome3 desktop"
+    yum: name={{ item }} state=latest
+    with_items:
+    - gdm
+    - gnome-desktop3
+    - gnome-session
+
+  - name: "copy configuration"
+    copy: src=../files/vncserver/xstartup.gnome.skel dest=/home/{{ username }}/.vnc/xstartup mode=0755 owner={{ username }} group={{ username }}

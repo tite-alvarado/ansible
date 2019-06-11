@@ -1,0 +1,44 @@
+  - name: "install vncserver"
+    yum: name={{ item }} state=latest
+    with_items:
+    - tigervnc-server
+
+  - include_role:
+      name: common
+      tasks_from: os_create_user.yml
+
+  - include_role:
+      name: common
+      tasks_from: install_libselinuxpython.yml
+
+  - name: "create configuration folder"
+    file: path=/home/{{ username }}/.vnc/ state=directory owner={{ username }} group={{ username }}
+
+  - name: "set vnc passwd for {{ username }}"
+    shell: su -l -c 'cd /home/{{ username }}/.vnc/ && echo {{ vnc_password }} | vncpasswd -f > ./passwd ' {{ username }}
+
+  - name: "set vncpasswd file attributes"
+    shell: su -l -c 'cd /home/{{ username }}/.vnc/ && chown {{ username }}.{{ username }} ./passwd && chmod 600 ./passwd' {{ username }}
+
+  - name: "copy gnome3 desktop configuration"
+    include: install_gnome3.yml
+    when: desktop == "gnome3"
+
+  - name: "copy mate desktop configuration"
+    include: install_mate.yml
+    when: desktop == "mate"
+
+  - name: "copy service configuration"
+    copy: src=../files/vncserver/vncserver@.service dest=/etc/systemd/system/vncserver@.service
+
+  - name: "bind vnc server to {{ username }} user"
+    replace: dest=/etc/systemd/system/vncserver@.service regexp='__USERNAME__' replace={{ username }}
+
+  - name: "reload systemd"
+    command: systemctl daemon-reload
+
+  - name: "load vncserver to systemd as display {{ display }}"
+    command: systemctl enable vncserver@:{{ display }}.service
+
+  - name: "ensure vncservice starts with boot"
+    service: name=vncserver@:{{ display }}.service state=restarted enabled=yes

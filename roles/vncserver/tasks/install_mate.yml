@@ -1,0 +1,14 @@
+# Install mate desktop
+  - include_role:
+      name: common
+      tasks_from: repo_install_epel.yml
+
+  - name: "install mate desktop"
+    yum: name={{ item }} state=latest
+    with_items:
+    - mate-desktop
+    - gdm
+    - caja
+
+  - name: "copy mate configuration"
+    copy: src=../files/vncserver/xstartup.mate.skel dest=/home/{{ username }}/.vnc/xstartup mode=0755 owner={{ username }} group={{ username }}
