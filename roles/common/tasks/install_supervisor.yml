@@ -1,0 +1,14 @@
+# Install supervisor process control
+---
+- name: "Install supervisor"
+  hosts: all
+  user: root
+
+  tasks:
+  - name: "install supervisor"
+    yum: name={{ item }} state=latest
+    with_items:
+    - supervisor
+
+  - name: "ensure supervisor runs on boot"
+    service: name=supervisord state=restarted enabled=yes

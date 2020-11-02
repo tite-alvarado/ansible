@@ -1,0 +1,291 @@
+# Orchestrated recipe to configure an OpenStack Controller server
+#  Requirements:
+#    . Server has two ips, one with internet, one natnetwork
+#    . /etc/hosts entries have been created towards each other server's private natnetworked address (controller, compute)
+
+- name: "Configure a default openstack controller server"
+  hosts: all
+  user: root
+
+- include: install_libselinuxpython.yml
+
+- include: install_chronyd.yml
+  vars:
+    ntp_server: "north-america.pool.ntp.org"
+    chrony_allowed_nets: [ 
+      '10.0.3.0/24',
+      '192.168.201.0/24'
+    ]  # one or more networks to serve chrony to the openstack servers
+
+- include: install_mariadb.yml
+  vars:
+    new_root_password: mariadb_pass
+# configure default db settings
+
+- include: install_memcached.yml
+
+# Install RabbitMQ and configure openstack user 
+- include: install_rabbitmq.yml
+  vars:
+    create_rmq_user: true
+    new_user_name: openstack
+    new_user_password: openst4ck
+
+# Configure Keystone DB and User
+- include: configure_mariadb_database.yml
+  vars:
+    database_name: 'keystone'
+    create_user: true
+    user_name: 'keystone'
+    user_password: 'keyst0ne'
+
+# Install OpenStack
+- include: repo_install_openstack.yml
+
+# Install OpenStack Keystone Identity Service
+- include: install_openstack-controller-keystone.yml
+  vars:
+    keystone_db_username: 'keystone' # from configure_mariadb_database.yml
+    keystone_db_password: 'keyst0ne'
+    keystone_db_name: 'keystone'
+    keystone_admin_pass: 'k3ystone'
+    bootstrap_admin_pass: 'admin_pass'
+    env_bootstrap_region_id: 'RegionOne'
+
+# Configure An OpenStack Project: Keystone
+- include: configure_openstack-project.yml
+  vars:
+    env_os_username: 'admin'
+    env_os_password: 'admin_pass'
+    env_os_project_name: 'admin'
+    env_os_user_domain_name: 'Default'
+    env_os_project_domain_name: 'Default'
+    env_os_auth_url: 'http://127.0.0.1:35357/v3'
+    env_os_public_url: 'http://127.0.0.1:5000/v3/'
+    env_os_identity_api_version: '3'
+    env_os_image_api_version: '2'
+    env_bootstrap_region_id: 'RegionOne'
+    # Action specific vars
+    create_demo_data: false
+    service_project_name: 'service'
+    demo_project_name: 'demo'
+    demo_user_name: 'demo'
+    demo_user_password: 'd3mo'
+    role_name: 'user'
+    create_demo_commands: [
+      "project create --domain default --description Service_Project {{ service_project_name }}",
+      "project create --domain default --description Demo_Project {{ demo_project_name }}",
+      "user create --domain default --password {{ demo_user_password }} {{ demo_user_name }}",
+      "role create {{ role_name }}",
+      "role add --project {{ demo_project_name }} --user {{ demo_user_name  }} {{ role_name }}"
+    ]
+
+# Configure Glance DB and User
+- include: configure_mariadb_database.yml
+  vars:
+    database_name: 'glance'
+    create_user: true
+    user_name: 'glance'
+    user_password: 'gl4nce'
+
+# Install Glance (Image) Service
+- include: install_openstack-controller-glance.yml
+  vars:
+    glance_db_username: 'glance'
+    glance_db_password: 'gl4nce'
+    glance_db_name: 'glance'
+    glance_admin_pass: 'glanc3'
+
+# Configure An OpenStack Project: Glance
+- include: configure_openstack-project.yml
+  vars:
+    env_os_username: 'admin'
+    env_os_password: 'admin_pass'
+    env_os_project_name: 'admin'
+    env_os_user_domain_name: 'Default'
+    env_os_project_domain_name: 'Default'
+    env_os_auth_url: 'http://127.0.0.1:35357/v3'
+    env_os_public_url: 'http://127.0.0.1:5000/v3/'
+    env_os_identity_api_version: '3'
+    env_os_image_api_version: '2'
+    env_bootstrap_region_id: 'RegionOne'
+    # Action specific vars
+    create_demo_data: true
+    service_project_name: 'service'
+    demo_project_name: 'demo'
+    demo_user_name: 'glance'
+    demo_user_password: 'glanc3'
+    service_type: 'image'
+    create_demo_commands: [
+      "user create --domain default --password {{ demo_user_password }} {{ demo_user_name }}",
+      "role add --project {{ service_project_name }} --user {{ demo_user_name }} admin",
+      "service create --name {{ demo_project_name }} --description OpenStack_Image {{ service_type }}",
+      "endpoint create --region {{ env_bootstrap_region_id }} {{ service_type }} public http://127.0.0.1:9292",
+      "endpoint create --region {{ env_bootstrap_region_id }} {{ service_type }} internal http://127.0.0.1:9292",
+      "endpoint create --region {{ env_bootstrap_region_id }} {{ service_type }} admin http://127.0.0.1:9292"
+    ]
+
+# Upload OS Images for Glance to use
+- include: configure_openstack-project-copy-glance-images.yml
+  vars:
+    glance_image_dir: '../../ansible_etc/images'
+    glance_image_dest_dir: '/opt/glance_images/'
+
+# Configure An OpenStack Project: Glance Upload images
+- include: configure_openstack-project.yml
+  vars:
+    env_os_username: 'admin'
+    env_os_password: 'admin_pass'
+    env_os_project_name: 'admin'
+    env_os_user_domain_name: 'Default'
+    env_os_project_domain_name: 'Default'
+    env_os_auth_url: 'http://127.0.0.1:35357/v3'
+    env_os_public_url: 'http://127.0.0.1:5000/v3/'
+    env_os_identity_api_version: '3'
+    env_os_image_api_version: '2'
+    env_bootstrap_region_id: 'RegionOne'
+    # Action specific vars
+    create_demo_data: true
+    glance_image_dest_dir: '/opt/glance_images/'
+    images:
+      - { image_name: 'CirrOS', image_file: 'cirros-0.3.4-x86_64-disk.img' }
+      - { image_name: 'cloudCoreOS', image_file: 'coreos_production_openstack_image.img' }
+      - { image_name: 'CentOS7', image_file: 'CentOS-7-x86_64-GenericCloud.qcow2' }
+      - { image_name: 'Debian9', image_file: 'debian-9-openstack-amd64.qcow2' }
+      - { image_name: 'FedoraCloud26', image_file: 'Fedora-Cloud-Base-26-1.5.x86_64.qcow2' }
+    # TODO: Validate these images checksums do not exist already before uploading
+    create_demo_commands: [
+      "image create --public --disk-format qcow2 --container-format bare --file {{ glance_image_dest_dir }}cirros-0.3.4-x86_64-disk.img CirrOS",
+      "image create --public --disk-format qcow2 --container-format bare --file {{ glance_image_dest_dir }}coreos_production_openstack_image.qcow2 CloudCoreOS",
+      "image create --public --disk-format qcow2 --container-format bare --file {{ glance_image_dest_dir }}CentOS-7-x86_64-GenericCloud.qcow2 CentOS7",
+      "image create \"Debian9\" --file {{ glance_image_dest_dir }}debian-9-openstack-amd64.qcow2 --disk-format qcow2 --container-format bare --public",
+      "image create --public --file {{ glance_image_dest_dir }}Fedora-Cloud-Base-26-1.5.x86_64.qcow2 --disk-format qcow2 --container-format bare FedoraCloud26",
+    ]
+    # {% for image in images %}
+    #   "image create {{ image.image_name }} --file \"{{ glance_image_dest_dir}}/{{ image.image_file }}\" --disk-format qcow2 --container-format bare --public",
+    # {% endfor %}
+
+# Configure Nova DB and User
+- include: configure_mariadb_database.yml
+  vars:
+    database_name: 'nova'
+    create_user: true
+    user_name: 'nova'
+    user_password: 'n0va'
+
+# Configure Nova Api DB and User
+- include: configure_mariadb_database.yml
+  vars:
+    database_name: 'nova_api'
+    create_user: true
+    user_name: 'nova'
+    user_password: 'n0va'
+    append_privileges: true
+
+# Configure An OpenStack Project: Nova Compute
+- include: configure_openstack-project.yml
+  vars:
+    env_os_username: 'admin'
+    env_os_password: 'admin_pass'
+    env_os_project_name: 'admin'
+    env_os_user_domain_name: 'Default'
+    env_os_project_domain_name: 'Default'
+    env_os_auth_url: 'http://127.0.0.1:35357/v3'
+    env_os_public_url: 'http://127.0.0.1:5000/v3/'
+    env_os_identity_api_version: '3'
+    env_os_image_api_version: '2'
+    env_bootstrap_region_id: 'RegionOne'
+    # Action specific vars
+    create_demo_data: true
+    nova_user_name: 'nova'
+    nova_user_password: 'nov4'
+    demo_project_name: 'service'
+    service_type: 'compute'
+    glance_image_dest_dir: '/opt/glance_images/'
+    create_demo_commands: [
+      "user create --domain default --password {{ nova_user_password }} {{ nova_user_name }}",
+      "role add --project {{ demo_project_name }} --user {{ nova_user_name }} admin",
+      "service create --name {{ nova_user_name }} --description OpenStack_{{ service_type }} {{ service_type }}",
+      "endpoint create --region {{ env_bootstrap_region_id }} {{ service_type }} public http://127.0.0.1:8774/v2.1/%\\(tenant_id\\)s",
+      "endpoint create --region {{ env_bootstrap_region_id }} {{ service_type }} internal http://127.0.0.1:8774/v2.1/%\\(tenant_id\\)s",
+      "endpoint create --region {{ env_bootstrap_region_id }} {{ service_type }} admin http://127.0.0.1:8774/v2.1/%\\(tenant_id\\)s",      
+    ]
+
+# Install Nova Compute Service
+- include: install_openstack-controller-nova.yml
+  vars:
+    nova_db_username: 'nova'
+    nova_db_password: 'n0va'
+    nova_db_name: 'nova'
+    nova_api_db_name: 'nova_api'
+    nova_admin_pass: 'nov4'
+    rabbitmq_host: '127.0.0.1'
+    rabbitmq_user: 'openstack'
+    rabbitmq_password: 'openst4ck'
+    my_management_ip: '0.0.0.0'
+
+# Configure Neutron DB and User
+- include: configure_mariadb_database.yml
+  vars:
+    database_name: 'neutron'
+    create_user: true
+    user_name: 'neutron'
+    user_password: 'n3utron'
+
+# Configure An OpenStack Project: Neutron Network
+- include: configure_openstack-project.yml
+  vars:
+    env_os_username: 'admin'
+    env_os_password: 'admin_pass'
+    env_os_project_name: 'admin'
+    env_os_user_domain_name: 'Default'
+    env_os_project_domain_name: 'Default'
+    env_os_auth_url: 'http://127.0.0.1:35357/v3'
+    env_os_public_url: 'http://127.0.0.1:5000/v3/'
+    env_os_identity_api_version: '3'
+    env_os_image_api_version: '2'
+    env_bootstrap_region_id: 'RegionOne'
+    # Action specific vars
+    create_demo_data: true
+    neutron_user_name: 'neutron'
+    neutron_admin_pass: 'neutr0n'
+    demo_project_name: 'service'
+    service_type: 'network'
+    create_demo_commands: [
+      "user create --domain default --password {{ neutron_admin_pass }} {{ neutron_user_name }}",
+      "role add --project {{ demo_project_name }} --user {{ neutron_user_name }} admin",
+      "service create --name {{ neutron_user_name }} --description OpenStack_{{ service_type }} {{ service_type }}",
+      "endpoint create --region {{ env_bootstrap_region_id }} {{ service_type }} public http://127.0.0.1:9696",
+      "endpoint create --region {{ env_bootstrap_region_id }} {{ service_type }} internal http://127.0.0.1:9696",
+      "endpoint create --region {{ env_bootstrap_region_id }} {{ service_type }} admin http://127.0.0.1:9696",
+    ]
+
+# Install Openstack Self Service Neutron Network
+#  TODO: Include tag to perform this conditionally, like enableSelfServiceNetwork below
+- include: install_openstack-controller-neutron-self-service.yml
+  vars:
+    neutron_db_username: 'neutron'
+    neutron_db_password: 'n3utron'
+    neutron_db_name: 'neutron'
+    neutron_admin_pass: 'neutr0n'
+    nova_db_username: 'nova'
+    nova_admin_pass: 'nov4'
+    rabbitmq_host: '127.0.0.1'
+    rabbitmq_user: 'openstack'
+    rabbitmq_password: 'openst4ck'
+    my_management_ip: '0.0.0.0'
+    internal_interface: enp0s8
+    external_interface: enp0s3
+
+# Install Openstack Neutron Service
+- include: install_openstack-controller-neutron.yml
+  vars:
+    neutron_db_username: 'neutron'
+    neutron_db_password: 'n3utron'
+    neutron_db_name: 'neutron'
+    neutron_admin_pass: 'neutr0n'
+    metadata_shared: 'metadat4'
+    enableSelfServiceNetwork: True 
+
+# Install Openstack Dashboard
+- include: install_openstack-controller-dashboard.yml

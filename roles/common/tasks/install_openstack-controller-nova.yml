@@ -1,0 +1,114 @@
+# Install OpenStack Nova (Compute) Service on OpenStack Controller
+---
+- name: "Install Nova (Compute) Service on OpenStack Controller"
+  hosts: all
+  user: root
+  vars:
+    nova_db_username: 'nova'
+    nova_db_password: 'n0va'
+    nova_db_name: 'nova'
+    nova_api_db_name: 'nova_api'
+    nova_admin_pass: 'nov4'
+    keystone_host: '127.0.0.1'
+    memcached_host: '127.0.0.1'
+    rabbitmq_host: '127.0.0.1'
+    rabbitmq_user: 'openstack'
+    rabbitmq_password: 'openst4ck'
+    my_management_ip: '0.0.0.0'
+
+  tasks:
+  - name: "Install Nova Compute Service"
+    yum: name={{ item }} state=latest
+    with_items:
+    - openstack-nova-api 
+    - openstack-nova-conductor 
+    - openstack-nova-console
+    - openstack-nova-novncproxy
+    - openstack-nova-scheduler
+
+  - name: "Configure Nova DB Access"
+    ini_file:
+      backup: yes
+      path: /etc/nova/nova.conf
+      section: database
+      option: connection
+      value: mysql+pymysql://{{ nova_db_username }}:{{ nova_db_password }}@127.0.0.1/{{ nova_db_name }}
+
+  - name: "Configure Nova RabbitMQ Access"
+    ini_file:
+      path: /etc/nova/nova.conf
+      section: DEFAULT
+      option: "{{ item.key }}"
+      value: "{{ item.value }}"
+    with_items:
+      - { key: 'enabled_apis', value: 'osapi_compute,metadata' }
+      - { key: 'auth_strategy', value: 'keystone' }
+      - { key: 'use_neutron', value: 'True' }
+      - { key: 'firewall_driver',  value: 'nova.virt.firewall.NoopFirewallDriver' }
+      - { key: 'transport_url', value: 'rabbit://{{ rabbitmq_user }}:{{ rabbitmq_password }}@{{ rabbitmq_host }}' }
+      - { key: 'my_ip', value: '{{ my_management_ip }}' } # IPv4 Local Address to connect to management network
+
+  - name: "Configure Nova API DB Access"
+    ini_file:
+      path: /etc/nova/nova.conf
+      section: api_database
+      option: connection
+      value: mysql+pymysql://{{ nova_db_username }}:{{ nova_db_password }}@127.0.0.1/{{ nova_api_db_name }}
+
+  - name: "Configure Nova Keystone Auth Access"
+    ini_file:
+      path: /etc/nova/nova.conf
+      section: keystone_authtoken
+      option: "{{ item.key }}"
+      value: "{{ item.value }}"
+    with_items:
+      - { key: 'auth_uri', value: 'http://{{ keystone_host }}:5000' }
+      - { key: 'auth_url', value: 'http://{{ keystone_host }}:35357' }
+      - { key: 'memcached_servers', value: '{{ memcached_host }}:11211' }
+      - { key: 'auth_type',  value: 'password' }
+      - { key: 'project_domain_name', value: 'Default' }
+      - { key: 'user_domain_name', value: 'Default' }
+      - { key: 'project_name', value: 'service' }
+      - { key: 'username', value: '{{ nova_db_username }}' }
+      - { key: 'password', value: '{{ nova_admin_pass }}' }
+
+  - name: "Configure Nova VNC Remote Console Access"
+    ini_file:
+      path: /etc/nova/nova.conf
+      section: vnc
+      option: "{{ item.key }}"
+      value: "{{ item.value }}"
+    with_items:
+      - { key: 'enabled', value: 'True' }
+      - { key: 'vncserver_listen', value: '{{ my_management_ip }}' }
+      - { key: 'vncserver_proxyclient_address', value: '{{ my_management_ip }}' }
+      - { key: 'novncproxy_base_url',  value: 'http://{{ my_management_ip }}:6080/vnc_auto.html' }
+
+  - name: "Configure Nova Glance Access"
+    ini_file:
+      path: /etc/nova/nova.conf
+      section: glance
+      option: api_servers
+      value: "http://127.0.0.1:9292"
+
+  - name: "Configure Nova Oslo Concurrency"
+    ini_file:
+      path: /etc/nova/nova.conf
+      section: oslo_concurrency
+      option: lock_path
+      value: "/var/lib/nova/tmp"
+
+  - name: "Populate Nova Compute Service DB"
+    command: "{{ item }}"
+    with_items:
+    - su -s /bin/sh -c "nova-manage api_db sync" {{ nova_db_username }}
+    - su -s /bin/sh -c "nova-manage db sync" {{ nova_db_username }}
+
+  - name: "Ensure Nova Compute Service starts with boot"
+    service: name={{ item }} state=restarted enabled=yes
+    with_items:
+    - openstack-nova-api.service
+    - openstack-nova-consoleauth.service
+    - openstack-nova-scheduler.service 
+    - openstack-nova-conductor.service 
+    - openstack-nova-novncproxy.service

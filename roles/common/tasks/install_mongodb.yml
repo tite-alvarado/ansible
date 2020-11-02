@@ -1,0 +1,14 @@
+# Install mongodb
+---
+- name: "Install mongodb nosql db"
+  hosts: all
+  user: root
+
+  tasks:
+  - name: "install mongodb"
+    yum: name={{ item }} state=latest
+    with_items:
+    - mongodb-server
+
+  - name: "ensure mongodb starts with boot"
+    service: name=mongod state=restarted enabled=yes

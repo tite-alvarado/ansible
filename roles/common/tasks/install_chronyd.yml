@@ -1,0 +1,40 @@
+# Install Chrony NTP
+#  Can control which networks to allow
+#  Can control whether to change ntp servers being used
+---
+- name: "Install Chrony"
+  hosts: all
+  user: root
+  vars:
+    change_ntp_servers: false
+    ntp_server: pool.ntp.org
+    # chrony_allowed_nets: [ '10.0.3.0/24', '192.168.201.0/24' ]
+
+  tasks:
+  - name: "Install Chrony"
+    yum: name=chrony state=latest
+
+  - name: "Backup current config"
+    replace:
+      dest: /etc/chrony.conf
+      regexp: "^Backup configuration"
+      backup: yes
+
+  - name: "Configure allowed networks"
+    lineinfile:
+      path: /etc/chrony.conf
+      insertafter: '.*Allow .*client '
+      line: 'allow {{ item }}'
+    with_items:
+      - "{{ chrony_allowed_nets }}"
+    when: chrony_allowed_nets is defined
+
+  - name: "Configure Chrony NTP server"
+    replace: 
+      dest: /etc/chrony.conf
+      regexp: '^server .*'
+      replace: 'server {{ ntp_server }} iburst'
+    when: change_ntp_servers
+
+  - name: "Enable and start Chrony service"
+    service: name=chronyd state=restarted enabled=yes

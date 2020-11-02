@@ -1,0 +1,28 @@
+# Recipe to extend an XFS LVM HDD volume,
+#  All parameters are mandatory
+#  Requires
+#    . xfs formatted empty drive to add to vg and lv
+#  Parameters
+#    . volume group to expand
+#    . logical volume to add drive to
+#    . path of empty drive to add (eg: /dev/sdb1)
+#    . mountpoint to extend
+---
+- name: "Extend a XFS Logical Volume"
+  hosts: all
+  user: root
+  vars:
+    vg_name: centos
+    lv_path: "/dev/centos/root"
+    drive: "/dev/sdb1"
+    mount: "/"
+
+  tasks:
+  - name: "Extending {{ vg_name }} Volume Group with {{ drive }}"
+    shell: vgextend -y {{ vg_name }} {{ drive }}
+
+  - name: "Extending {{ lv_path }} to Max new size"
+    shell: lvextend -l +100%FREE {{ lv_path }}
+
+  - name: "Extending {{ mount }} filesystem"
+    shell: xfs_growfs {{ mount }}

@@ -1,0 +1,36 @@
+# Install and configure openvpn server
+---
+- name: "Install openvpn server"
+  hosts: all
+  user: root
+
+  tasks:
+  - name: "install openvpn"
+    yum: name={{ item }} state=latest
+    with_items:
+    - openvpn
+    - easy-rsa
+
+  - name: "find openvpn configuration example"
+    shell: find /usr/share/doc/openvpn* -iname server.conf
+    register: conf_file
+
+  - name: "copy configuration from example {{ conf_file }}"
+    command: creates=/etc/openvpn/server.conf cp {{ conf_file.stdout }}  /etc/openvpn/
+
+  - name: "replace dh bits"
+    replace: dest=/etc/openvpn/server.conf backup=yes regexp='^dh .*' replace='dh 2048.pem'
+
+  - name: "ensure openvpn runs as nobody"
+    replace: dest=/etc/openvpn/server.conf regexp='user .*' replace='user nobody'
+
+  - name: " ensure openvpn runs as nobody group"
+    replace: dest=/etc/openvpn/server.conf regexp='group .*' replace='group nobody'
+
+  - name: "create key directory"
+    file: name=/etc/openvpn/easy-rsa/keys state=directory recurse=yes
+
+  # Todo: generate ca.crt, server.key, ta.key user certificates
+
+  # - name: "ensure openvpn starts with boot"
+  #  service: name=openvpn state=restarted enabled=yes

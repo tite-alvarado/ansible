@@ -1,0 +1,11 @@
+# Install ansible software
+---
+- name: "Install ansible management and orchestration system"
+  hosts: all
+  user: root
+
+  tasks:
+  - name: "install ansible management"
+    yum: name={{ item }} state=latest
+    with_items: 
+    - ansible

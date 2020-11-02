@@ -1,0 +1,14 @@
+# Install nginx webserver
+---
+- name: "Install nginx webserver"
+  hosts: all
+  user: root
+
+  tasks:
+  - name: "install nginx webserver"
+    yum: name={{ item }} state=latest
+    with_items:
+    - nginx
+
+#  - name: "enable nginx on boot"
+#    service: name=nginx state=restarted enabled=yes

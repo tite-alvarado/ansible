@@ -1,0 +1,71 @@
+# Deploy node app to username's home directory
+#
+#  Parameters :
+#   * Username
+#   * webapp name
+#   * port to deploy app
+#   * mongo db password (username is app name)
+---
+- name: Install node app
+  hosts: all
+  user: root
+
+  tasks:
+  - name: C++ is a NodeJS build prerequisite
+    yum: name=gcc-c++ state=latest
+
+  - name: Copy bundle from files folder
+    copy: src=../files/meteor/webapps/{{ app_name }}.tar.gz dest=/tmp/{{ app_name }}.tar.gz
+  
+  - name: Remove existing webapp
+    shell: if [ -e /home/{{ username }}/webapps/{{ app_name }}/ ] ; then rm -rf /home/{{ username }}/webapps/{{ app_name }}/ ; fi
+
+  - name: Create app target folder if it doesnt exist under username
+    file: path=/home/{{ username }}/webapps/{{ app_name }} recurse=yes state=directory owner={{ username }} group={{ username }}
+
+  - name: Unarchive meteor app bundle
+    unarchive: src=../files/meteor/webapps/{{ app_name }}.tar.gz dest=/home/{{ username }}/webapps/{{ app_name }} owner={{ username }} group={{ username }}
+
+  - name: Install npm modules
+    shell: su -l -c 'cd /home/{{ username }}/webapps/{{ app_name }}/bundle/programs/server/ && npm install ' {{ username }}
+
+# nginx config
+#
+  - name: copy skeleton nginx config
+    copy: src=../files/meteor/conf/nginx.skel dest=/etc/nginx/conf.d/{{ app_name }}.conf
+
+  - name: create new nginx config based on app - app name
+    replace: dest=/etc/nginx/conf.d/{{ app_name }}.conf regexp='__APP_NAME__' replace={{ app_name }}
+
+  - name: create new nginx config based on app - port
+    replace: dest=/etc/nginx/conf.d/{{ app_name }}.conf regexp='__PORT__' replace={{ port }}
+
+#  - name: reload nginx service
+#    service: name=nginx state=reloaded
+
+    
+# supervisor config
+# 
+  - name: copy node supervisor config
+    copy: src=../files/meteor/conf/supervisord.skel dest=/etc/supervisord.d/{{ app_name }}.ini
+
+  - name: create new supervisord config to manage the node js instance - app name
+    replace: dest=/etc/supervisord.d/{{ app_name }}.ini regexp='__APP_NAME__' replace={{ app_name }}
+
+  - name: create new supervisord config to manage the node js instance - port
+    replace: dest=/etc/supervisord.d/{{ app_name }}.ini regexp='__PORT__' replace={{ port }}
+
+  - name: create new supervisord config to manage the node js instance - username
+    replace: dest=/etc/supervisord.d/{{ app_name }}.ini regexp='__USERNAME__' replace={{ username }}
+
+  - name: create new supervisord config to manage the node js instance - mongo
+    replace: dest=/etc/supervisord.d/{{ app_name }}.ini regexp='__MONGO_PASS__' replace={{ mongo_pass }}
+
+  - name: touch application meteor logs
+    command: su -l -c 'cd /home/{{ username }}/webapps/{{ app_name }}/ && touch meteor.log meteor_err.log ' {{ username }}
+
+  - name: reload supervisord
+    service: name=supervisord state=restarted enabled=yes
+
+  - name: reload supervisord nodejs instances
+    command: supervisorctl restart {{ app_name }}

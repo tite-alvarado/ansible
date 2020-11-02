@@ -1,0 +1,12 @@
+# Install node js server
+---
+- name: "Install nodejs server"
+  hosts: all
+  user: root
+
+  tasks:
+  - name: "install node.js server"
+    yum: name={{ item }} state=latest
+    with_items: 
+    - nodejs
+    - npm

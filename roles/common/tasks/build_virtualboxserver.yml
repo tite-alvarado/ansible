@@ -1,0 +1,26 @@
+# Orchestrated recipe to build a virtualbox server
+#
+#  Requires new username to run vbox under
+---
+- name: "Configure a default Virtualbox server"
+  hosts: all
+  user: root
+
+- include: repo_install_epel.yml
+- include: install_libselinuxpython.yml
+ 
+- include: os_create_user.yml 
+  vars: 
+    username: "{{ username }}"
+
+- include: install_vncserver.yml
+  vars: 
+    username: "{{ username }}"
+
+- include: install_virtualbox.yml
+
+- include: configure_virtualboxvncboot.yml
+  vars:
+    username: "{{ username }}"
+
+- include: reboot_and_wait.yml

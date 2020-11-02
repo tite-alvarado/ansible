@@ -1,0 +1,15 @@
+# Install memcached
+---
+- name: "Install memcached"
+  hosts: all
+  user: root
+
+  tasks:
+  - name: "Install memcached"
+    yum: name={{ item }} state=latest
+    with_items:
+    - memcached
+    - python-memcached
+
+  - name: "Ensure memcached starts with boot"
+    service: name=memcached state=restarted enabled=yes

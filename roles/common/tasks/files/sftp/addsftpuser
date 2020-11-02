@@ -1,0 +1,44 @@
+#!/bin/csh
+if ($#argv == 1 && $argv != "root") then
+	clear
+	echo "    sFTP User Account Setup"
+	echo
+	echo "Type one of the existing folder names:"
+	echo
+	ls -1 __HOMEDIR__ |egrep -v '^automan$|^eng$|^etc$|^lost\+found$' |sed 's/.*/    &/'
+	echo
+	printf "OR you can suggest a new home folder name for $1 > "
+	set F=$<
+	echo "Sripping spaces and funny characters... OK"
+	set F=`echo "$F" |tr -d '[:punct:]'`
+	if ("$F" == "") then
+		echo "No folder name given... exiting"
+		exit
+		endif
+	echo
+	echo "Setting $1 home folder as __HOMEDIR__/$F"
+	printf "Is this correct? (type yes to proceed) > "
+	set G="$<"
+	if !("$G" == "yes") exit
+	mkdir __HOMEDIR__/$F
+	chmod 755 __HOMEDIR__/$F
+	chown root:__USERGROUP__ __HOMEDIR__/$F
+        mkdir __HOMEDIR__/$F/uploads
+	/usr/sbin/useradd -c "$1 __USERGROUP__ sftp user" -g __USERGROUP__ -M -d /$F -s /sbin/nologin $1
+        chown $1 __HOMEDIR__/$F/uploads
+	echo
+	printf "Please enter a password for $1 > "
+	set H=$<
+	echo $H |passwd $1 --stdin
+	echo
+        if ! $?SUDO_USER  then
+	  set SUDO_USER="root"
+        endif
+	echo $SUDO_USER": user $1 / $H is chrooted into __HOMEDIR__/$F for sftp"
+	echo $SUDO_USER": user $1 / $H is chrooted into __HOMEDIR__/$F for sftp" >> /var/log/sftpuseradmin.log
+	else
+	echo "ERROR: usage addsftpuser username"
+	endif
+
+exit
+

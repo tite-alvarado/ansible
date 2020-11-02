@@ -1,0 +1,14 @@
+# Install openjdk
+---
+- name: "Install openjdk"
+  hosts: all
+  user: root
+  vars:
+    - major: 8
+
+  tasks:
+  - name: "install openjdk"
+    yum: name={{ item }} state=latest
+    with_items:
+    - java-1.{{ major }}.0-openjdk
+    - java-1.{{ major }}.0-openjdk-devel

@@ -1,0 +1,27 @@
+# Remove node app from username's home directory
+#
+#  Parameters :
+#   * Username
+#   * webapp name
+---
+- name: Remove node app
+  hosts: all
+  user: root
+
+  tasks:
+# supervisor config
+# 
+  - name: stop supervisord nodejs instances
+    command: supervisorctl stop {{ app_name }}
+
+  - name: copy node supervisor config
+    file: path=/etc/supervisord.d/{{ app_name }}.ini state=absent
+ 
+# nginx config
+#
+  - name: remove nginx config
+    file: name=/etc/nginx/conf.d/{{ app_name }}.conf state=absent
+
+# meteor app bye bye
+  - name: Remove existing webapp
+    shell: if [ -e /home/{{ username }}/webapps/{{ app_name }}/ ] ; then rm -rf /home/{{ username }}/webapps/{{ app_name }}/ ; fi

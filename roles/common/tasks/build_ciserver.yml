@@ -1,0 +1,35 @@
+# Orchestrated recipe to build a Jenkins CI/management server
+#  Features:
+#    - Server is able to detect bitbucket commits and build tar files (meteor/nodejs)
+#    - Server is able to push built apps to specified target app servers using
+#       . username
+#       . app_name
+#       . port
+#       . mongo_db
+---
+- name: "Configure a Jenkins CI server "
+  hosts: all
+  user: root
+  vars:
+    username: "jenkins"
+    include_meteor: true
+    include_maven: true
+    include_nightwatch: true
+
+- include: repo_install_epel.yml
+- include: install_libselinuxpython.yml
+ 
+- include: install_jenkins.yml 
+
+- include: install_meteor.yml
+  # when: include_meteor
+  vars: 
+    username: "{{ username }}"
+
+- include: install_maven.yml
+  # when: include_maven
+
+- include: install_nodejsserver.yml
+
+- include: install_nightwatchjs.yml
+  # when: include_nightwatch

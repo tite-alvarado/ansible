@@ -1,0 +1,27 @@
+# Install jenking continous integration system
+---
+- name: "Install Jenkins CI"
+  hosts: all
+  user: root
+
+  tasks:
+  - name: "install prerequisite to copy files"
+    yum: name=libselinux-python state=latest
+
+  - name: "copy jenkins repo"
+    copy: src=../files/jenkins.repo dest=/etc/yum.repos.d/
+
+  - name: "add jekins repo rpm key"
+    rpm_key: state=present key=https://jenkins-ci.org/redhat/jenkins-ci.org.key
+
+  - name: "install jenkins"
+    yum: name={{ item }} state=latest
+    with_items:
+    - java-1.8.0-openjdk
+    - jenkins
+
+  - name: "ensure jenkins starts at boot"
+    service: name=jenkins state=restarted enabled=yes
+
+  - name: "enable shell for jenkins user"
+    user: name=jenkins shell=/bin/bash

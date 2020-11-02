@@ -1,0 +1,71 @@
+# Install OpenStack Neutron (Network) Service on OpenStack Controller
+---
+- name: "Install Neutron (Network) Service on OpenStack Controller"
+  hosts: all
+  user: root
+  vars:
+    neutron_db_username: 'neutron'
+    neutron_db_password: 'n3utron'
+    neutron_db_name: 'neutron'
+    neutron_admin_pass: 'neutr0n'
+    metadata_secret: 'metadat4'
+    enableSelfServiceNetwork: True
+
+  tasks:
+  - name: "Configure the Neutron metadata agent"
+    ini_file:
+      path: /etc/neutron/l3_agent.ini
+      section: DEFAULT
+      option: "{{ item.key }}"
+      value: "{{ item.value }}"
+    with_items:
+      - { key: 'nova_metadata_ip', value: '127.0.0.1' }
+      - { key: 'metadata_proxy_shard_secret', value: '{{ metadata_secret }}' }
+
+  - name: "Configure the Neutron Service DB Access"
+    ini_file:
+      path: /etc/neutron/neutron.conf
+      section: database
+      option: connection
+      value: mysql+pymysql://{{ neutron_db_username }}:{{ neutron_db_password }}@127.0.0.1/{{ neutron_db_name }}
+
+  - name: "Configure the Compute service to use Neutron Networking service"
+    ini_file:
+      path: /etc/nova/nova.conf
+      section: neutron
+      option: "{{ item.key }}"
+      value: "{{ item.value }}"
+    with_items:
+      - { key: 'url', value: 'http://127.0.0.1:9696' }
+      - { key: 'auth_url', value: 'http://127.0.0.1:35357' }
+      - { key: 'auth_type',  value: 'password' }
+      - { key: 'project_domain_name', value: 'Default' }
+      - { key: 'user_domain_name', value: 'Default' }
+      - { key: 'project_name', value: 'service' }
+      - { key: 'username', value: '{{ neutron_db_username }}' }
+      - { key: 'password', value: '{{ neutron_admin_pass }}' }
+      - { key: 'service_metadata_proxy', value: 'True' }
+      - { key: 'metadata_proxy_shared_secret', value: '{{ metadata_secret }}' }
+
+  - name: "Create a link to ML2 Config for Neutron"
+    shell: ln -fs /etc/neutron/plugins/ml2/ml2_conf.ini /etc/neutron/plugin.ini
+
+  - name: "Populate Nova Compute Service DB"
+    command: "{{ item }}"
+    with_items:
+    - su -s /bin/sh -c "neutron-db-manage --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/plugins/ml2/ml2_conf.ini upgrade head" {{ neutron_db_username }}
+
+  - name: "Ensure Neutron Network Service starts with boot"
+    service: name={{ item }} state=restarted enabled=yes
+    with_items:
+    - openstack-nova-api
+    - neutron-server.service 
+    - neutron-linuxbridge-agent.service 
+    - neutron-dhcp-agent.service
+    - neutron-metadata-agent.service
+
+  - name: "Ensure Self serve network agent starts with boot"
+    service: name={{ item }} state=restarted enabled=yes
+    with_items:
+    - neutron-l3-agent
+    when: enableSelfServiceNetwork

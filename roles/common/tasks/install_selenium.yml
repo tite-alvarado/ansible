@@ -1,0 +1,38 @@
+# Install SeleniumRC webdriver server
+---
+- name: "Install seleniumRC java webdriver server"
+  hosts: all
+  user: root
+  vars:
+    selenium_server: "selenium-server-standalone-3.0.1.jar"
+
+  tasks:
+  - name: "Create webdriver server folder on {{ username }} home"
+    file: dest=/home/{{ username }}/selenium_rc/ state=directory owner={{ username }} group={{ username }}
+
+  - name: "Copy seleniumRC webdriver server to {{ username }}/selenium_rc/"
+    copy: src=../files/selenium/{{ selenium_server }} dest=/home/{{ username }}/selenium_rc/ owner={{ username }} group={{ username }}
+
+  - name: "Create gnome autorun folder"
+    file: dest=/home/{{ username }}/.config/autostart/  state=directory owner={{ username }} group={{ username }}
+
+  - name: "Copy autorun file to start seleniumRC with {{ username }} gnome session"
+    copy: src=../files/vncserver/selenium.desktop dest=/home/{{ username }}/.config/autostart/ owner={{ username }} group={{ username }} 
+
+  - name: "Replace username on seleniumRC autostart file"
+    replace: dest=/home/{{ username }}/.config/autostart/selenium.desktop regexp='__USERNAME__' replace="{{ username }}"
+
+  - name: "Replace server name on seleniumRC autostart file"
+    replace: dest=/home/{{ username }}/.config/autostart/selenium.desktop regexp='__SELENIUM_SERVER__' replace="{{ selenium_server }}"
+
+  #- name: "Install firefox"
+  #  yum: name=firefox state=latest
+
+  - name: "Install xterm"
+    yum: name=xterm state=latest
+
+  - name: "Install chromium webdriver"
+    yum: name={{ item }} state=latest
+    with_items:
+      - chromium
+      - chromedriver

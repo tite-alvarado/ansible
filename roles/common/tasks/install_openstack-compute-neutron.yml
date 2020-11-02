@@ -1,0 +1,61 @@
+# Install OpenStack Neutron (Network) Service on OpenStack Compute Node
+---
+- name: "Install Neutron (Network) Service on OpenStack Compute Node"
+  hosts: all
+  user: root
+  vars:
+    provider_interface: 'enp0s8'
+    provider_ip: '10.0.3.91'
+    rabbitmq_host: '10.0.3.90'
+    rabbitmq_user: 'openstack'
+    rabbitmq_password: 'openst4ck'
+
+  tasks:
+  - name: "Install Neutron Linux Bridges"
+    yum: name={{ item }} state=latest
+    with_items:
+    - openstack-neutron-linuxbridge
+
+  - name: "Configure the Neutron transport agent"
+    ini_file:
+      path: /etc/neutron/neutron.conf
+      section: DEFAULT 
+      option: "{{ item.key }}"
+      value: "{{ item.value }}"
+    with_items:
+      - { key: 'transport_url', value: 'rabbit://{{ rabbitmq_user }}:{{ rabbitmq_password }}@{{ rabbitmq_host }}' }
+
+  - name: "Configure the Neutron metadata agent"
+    ini_file:
+      path: /etc/neutron/plugins/ml2/linuxbridge_agent.ini
+      section: linux_bridge
+      option: "{{ item.key }}"
+      value: "{{ item.value }}"
+    with_items:
+      - { key: 'physical_interface_mappings', value: 'provider:{{ provider_interface }}' }
+
+  - name: "Configure the Neutron VLAN settings"
+    ini_file:
+      path: /etc/neutron/plugins/ml2/linuxbridge_agent.ini
+      section: vxlan
+      option: "{{ item.key }}"
+      value: "{{ item.value }}"
+    with_items:
+      - { key: 'enable_vxlan', value: 'true' }
+      - { key: 'local_ip', value: '{{ provider_ip }}' }
+      - { key: 'l2_population', value: 'true' }
+
+  - name: "Configure the Neutron Security Group Settings"
+    ini_file:
+      path: /etc/neutron/plugins/ml2/linuxbridge_agent.ini
+      section: securitygroup
+      option: "{{ item.key }}"
+      value: "{{ item.value }}"
+    with_items:
+      - { key: 'enable_securitygroup', value: 'true' }
+      - { key: 'firewall_driver', value: 'neutron.agent.linux.iptables_firewall.IptablesFirewallDriver' }
+
+  - name: "Ensure Neutron Network Service starts with boot"
+    service: name={{ item }} state=restarted enabled=yes
+    with_items:
+    - neutron-linuxbridge-agent.service 

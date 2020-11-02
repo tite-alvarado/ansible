@@ -1,0 +1,95 @@
+# Configure sshd to also server sftp
+#
+#  Parameters :
+#   * Usergroup
+#   * Home directory for sftp chroots
+---
+- name: Configure SSHD to provide SFTP
+  hosts: all
+  user: root
+  vars:
+    usergroup: "sftp_users"
+    homedirs: "/home/sftp_users"
+
+  tasks:
+# File copy ansible module and utility prerequisite
+#
+  - name: install libselinux-python utils
+    yum: name={{ item }} state=latest
+    with_items:
+    - libselinux-python
+    - tcsh
+
+# Register date
+# 
+  - name: "Register date"
+    shell: date +%F_%H_%M
+    register: ahora
+
+  - name: "Backup current sshd config"
+    lineinfile: dest=/etc/ssh/sshd_config insertafter=EOF line="# {{ ahora.stdout }} Adding SFTP group {{ usergroup }}" backup=yes state=present
+
+# System group creation
+#
+  - name: "Create usergroup"
+    group: name={{ usergroup }}
+
+  - name: "Create home folder for {{ usergroup }}"
+    file: dest={{ homedirs }} state=directory group={{ usergroup }}
+
+# SSHD Configuration
+#
+  - name: "Find out if group {{ usergroup }} has already been enabled for SFTP"
+    shell: grep "Match Group {{ usergroup }}" /etc/ssh/sshd_config >/dev/null 2>&1 ; echo $?
+    register: isEnabled
+ 
+  - name: "Disable X forwarding if enabled"
+    replace: dest=/etc/ssh/sshd_config regexp="^X11Forwarding .*" replace="X11Forwarding no"
+    when: isEnabled.stdout == "1"
+  
+  - name: "Enable subsystem override"
+    lineinfile: dest=/etc/ssh/sshd_config regexp="^Subsystem.*sftp.*openssh/sftp-server" state=absent
+    when: isEnabled.stdout == "1"
+
+  - name: "Find out if SFTP subsystem has already been enabled"
+    shell: grep "Subsystem sftp internal-sftp" /etc/ssh/sshd_config >/dev/null 2>&1 ; echo $?
+    register: isEnabledSFTP
+
+  - name: "Add sftp subsystem"
+    lineinfile: dest=/etc/ssh/sshd_config insertafter=EOF line="Subsystem sftp internal-sftp" state=present
+    when: isEnabledSFTP.stdout == "1"
+ 
+  - name: "Add sftp usergroup sshd configuration for {{ usergroup }}"
+    lineinfile: dest=/etc/ssh/sshd_config insertafter=EOF state=present line="Match Group {{ usergroup }}"
+    when: isEnabled.stdout == "1"
+
+  - name: "Add sftp usergroup forbid X forwarding"
+    lineinfile: dest=/etc/ssh/sshd_config regexp=EOF insertafter=EOF line="  X11Forwarding no" state=present
+    when: isEnabled.stdout == "1"
+
+  - name: "Add sftp usergroup forbid TCP forwarding"
+    lineinfile: dest=/etc/ssh/sshd_config regexp=EOF insertafter=EOF line="  AllowTcpForwarding no" state=present
+    when: isEnabled.stdout == "1"
+
+  - name: "Add chroot directory to home"
+    lineinfile: dest=/etc/ssh/sshd_config insertafter=EOF line="  ChrootDirectory {{ homedirs }}/%h" state=present
+    when: isEnabled.stdout == "1"
+
+  - name: "Add force sftp command"
+    lineinfile: dest=/etc/ssh/sshd_config regexp=EOF insertafter=EOF line="  ForceCommand internal-sftp" state=present
+    when: isEnabled.stdout == "1"
+
+# Copy utility wrapper for user creation
+#
+  - name: "Copy user creation utility wrapper"
+    copy: src=../files/sftp/addsftpuser dest=/usr/local/bin/addsftpuser owner=root group=root mode=0755
+
+  - name: "Replace group in utility wrapper"
+    replace: dest=/usr/local/bin/addsftpuser regexp="__USERGROUP__" replace={{ usergroup }}
+
+  - name: "Replace homedir in utility wrapper"
+    replace: dest=/usr/local/bin/addsftpuser regexp="__HOMEDIR__" replace={{ homedirs }}
+
+  - name: "Restart sshd"
+    service: name=sshd state=restarted enabled=yes
+    when: isEnabled.stdout == "1"

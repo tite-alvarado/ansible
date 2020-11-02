@@ -1,0 +1,42 @@
+# Recipe to configure a database on localhost db server,
+#  optionally a username with a password for it
+#  Requires
+#    . target db server credentials
+#    . database_name
+#  Optional
+#    . user_name
+#    . user_password
+---
+- name: "Configure a database"
+  hosts: all
+  user: root
+  vars:
+    # db_host: ""
+    # db_user: ""
+    # db_password: ""
+    create_database: true
+    database_name: "new_database"
+    create_user: true
+    user_name: "db_user"
+    user_password: "db_password"
+    append_privileges: false
+
+  tasks:
+  - name: "Creating {{ database_name }} DB"
+    mysql_db:
+      name: "{{ database_name }}"
+      state: present
+      login_host: "{{ db_host | default('localhost') }}"
+      login_user: "{{ db_user | default('root') }}"
+      login_password: "{{ db_password | default('') }}"
+    when: create_database
+
+  - name: "Add DB user {{ user_name }}"
+    mysql_user:
+      name: "{{ user_name }}"
+      state: present
+      host: localhost
+      password: "{{ user_password }}"
+      priv: "{{ database_name }}.*:ALL"
+      append_privs: "{{ append_privileges }}"
+    when: create_user

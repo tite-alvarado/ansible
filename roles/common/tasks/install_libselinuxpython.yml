@@ -1,0 +1,11 @@
+# Install libselinux utils
+---
+- name: Install libselinux utils
+  hosts: all
+  user: root
+
+  tasks:
+  - name: install libselinux-python utils
+    yum: name={{ item }} state=latest                                                                                                                                                                                                        
+    with_items:                                                                                                                                                                                                                              
+    - libselinux-python

@@ -1,0 +1,21 @@
+[program:__APP_NAME__]
+command=node main.js						; the program (relative uses PATH, can take args)
+directory=/home/__USERNAME__/webapps/__APP_NAME__/bundle
+process_name=%(program_name)s					; process_name expr (default %(program_name)s)
+numprocs=1							; number of processes copies to start (def 1)
+autostart=true							; start at supervisord start (default: true)
+autorestart=unexpected						; whether/when to restart (default: unexpected)
+user=__USERNAME__						; setuid to this UNIX account to run the program
+redirect_stderr=true          ; redirect proc stderr to stdout (default false)
+stdout_logfile=/home/__USERNAME__/webapps/__APP_NAME__/meteor.log        ; stdout log path, NONE for none; default AUTO
+stdout_logfile_maxbytes=100MB ; max # logfile bytes b4 rotation (default 50MB)
+stdout_logfile_backups=5      ; # of stdout logfile backups (default 10)
+;stdout_capture_maxbytes=1MB  ; number of bytes in 'capturemode' (default 0)
+;stdout_events_enabled=false  ; emit events on stdout writes (default false)
+stderr_logfile=/home/__USERNAME__/webapps/__APP_NAME__/meteor_err.log        ; stderr log path, NONE for none; default AUTO
+stderr_logfile_maxbytes=100MB ; max # logfile bytes b4 rotation (default 50MB)
+stderr_logfile_backups=5      ; # of stderr logfile backups (default 10)
+;stderr_capture_maxbytes=1MB   ; number of bytes in 'capturemode' (default 0)
+;stderr_events_enabled=false   ; emit events on stderr writes (default false)
+environment=PORT="__PORT__", ROOT_URL="https://localhost:__PORT__/", MAIL_URL="", MONGO_URL="mongodb://__APP_NAME__:__MONGO_PASS__@localhost/__APP_NAME__"       ; process environment additions (def no adds)
+;serverurl=AUTO                ; override serverurl computation (childutils) 

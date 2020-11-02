@@ -1,0 +1,47 @@
+# Orchestrated recipe to configure an OpenStack Compute server
+#  Requirements:
+#    . Server has two ips, one with internet, one natnetwork
+#    . /etc/hosts entries have been created towards each other server's private natnetworked address (controller, compute)
+
+- name: "Configure a default openstack compute server"
+  hosts: all
+  user: root
+
+- include: install_libselinuxpython.yml
+
+- include: install_chronyd.yml
+  vars:
+    change_ntp_servers: true
+    ntp_server: "controller"
+    chrony_allowed_nets: [
+      '10.0.3.0/24',
+      '192.168.201.0/24'
+    ]  # one or more networks to serve chrony to the openstack servers
+
+# Install OpenStack
+- include: repo_install_openstack.yml
+
+# Install Openstack Nova Compute service
+- include: install_openstack-compute-nova.yml
+  vars: # Use same vars as build_openstack-controller recipe
+    nova_db_username: 'nova'
+    nova_db_password: 'n0va'
+    nova_db_name: 'nova'
+    nova_api_db_name: 'nova_api'
+    nova_admin_pass: 'nov4'
+    keystone_host: '192.168.201.90'
+    memcached_host: '192.168.201.90'
+    rabbitmq_host: '192.168.201.90'
+    rabbitmq_user: 'openstack'
+    rabbitmq_password: 'openst4ck'
+    my_management_ip: '0.0.0.0'
+    nova_host: '192.168.201.90'
+
+# Configure Self Service Network Agent
+- include: install_openstack-compute-neutron.yml
+  vars:
+    provider_interface: 'enp0s8'
+    provider_ip: '10.0.3.91'
+    rabbitmq_host: '10.0.3.90'
+    rabbitmq_user: 'openstack'
+    rabbitmq_password: 'openst4ck'

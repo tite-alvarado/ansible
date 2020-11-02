@@ -1,0 +1,125 @@
+# Install vsftpd
+---
+- name: "Install VSFTPD server"
+  hosts: all
+  user: root
+  vars:
+    homedirs: "/home/ftp-vsftp/"
+    common_name: "{{ ansible_host }}"
+    C: "CR"
+    ST: "SC"
+    L: "SC"
+    O: "Personal"
+    
+  tasks:
+  - name: "install vsftpd and csh"
+    yum: name={{ item }} state=latest
+    with_items:
+    - libselinux-python
+    - vsftpd
+    - tcsh
+
+  - name: "remove anonymous logins"
+    replace: dest=/etc/vsftpd/vsftpd.conf regexp="^anonymous_enable=.*" replace="anonymous_enable=NO" backup=yes
+
+  - name: "enable local logins"
+    replace: dest=/etc/vsftpd/vsftpd.conf regexp="^local_enable=.*" replace="local_enable=YES"
+
+  - name: "grant write access to local users"
+    replace: dest=/etc/vsftpd/vsftpd.conf regexp="^write_enable=.*" replace="write_enable=YES"
+
+  - name: "grant write access to local users"
+    replace: dest=/etc/vsftpd/vsftpd.conf regexp="^=.*" replace="write_enable=YES"
+
+  - name: "chroot local users"
+    replace: dest=/etc/vsftpd/vsftpd.conf regexp=".*chroot_local_user=.*" replace="chroot_local_user=YES"
+
+  - name: "configure on standalone mode"
+    replace: dest=/etc/vsftpd/vsftpd.conf regexp="^listen=.*" replace="listen=YES"
+
+  - name: "remove ipv6 server"
+    replace: dest=/etc/vsftpd/vsftpd.conf regexp="^listen_ipv6=.*" replace="listen_ipv6=NO"
+
+  - name: "change local umask"
+    replace: dest=/etc/vsftpd/vsftpd.conf regexp="^local_umask=.*" replace="local_umask=002"
+
+  - name: "change FTP banner"
+    replace: dest=/etc/vsftpd/vsftpd.conf regexp=".*ftpd_banner=.*" replace="ftpd_banner=Welcome to VSFTP service."
+
+  - name: "add text userdb names directive"
+    lineinfile: dest=/etc/vsftpd/vsftpd.conf insertafter=EOF line="text_userdb_names=YES" state=present
+
+  - name: "add chmod directive"
+    lineinfile: dest=/etc/vsftpd/vsftpd.conf insertafter=EOF line="chmod_enable=NO" state=present
+
+  - name: "add localtime directive"
+    lineinfile: dest=/etc/vsftpd/vsftpd.conf insertafter=EOF line="use_localtime=YES" state=present
+
+  - name: "create chroot homedirs folder"
+    file: dest={{ homedirs }} state=directory
+
+# Configure VSFTPD SSL identity
+#
+  - name: "find out if we had already created a certs folder and file"
+    shell: ls /etc/ssl/certs/private >/dev/null 2>&1 ; echo $?
+    ignore_errors: yes
+    register: had_certs
+
+  - name: "create folder for private certs"
+    file: dest=/etc/ssl/certs/private state=directory
+    when: had_certs.stdout == "2"
+
+  - name: "create tls identity and key for vsftpd server valid for 20 years"
+    shell: openssl req -x509 -nodes -days 7300 -newkey rsa:2048 -keyout /etc/ssl/certs/private/vsftpd.pem -out /etc/ssl/certs/private/vsftpd.pem -subj "/C={{ C }}/ST={{ ST }}/L={{ L }}/O={{ O }}/CN={{ common_name }}" creates=/etc/ssl/certs/private/vsftpd.pem
+
+  - name: "add vsftpd cert config"
+    lineinfile: dest=/etc/vsftpd/vsftpd.conf insertafter=EOF line="rsa_cert_file=/etc/ssl/certs/private/vsftpd.pem" state=present
+
+  - name: "add vsftpd key config"
+    lineinfile: dest=/etc/vsftpd/vsftpd.conf insertafter=EOF line="rsa_private_key_file=/etc/ssl/certs/private/vsftpd.pem" state=present
+
+  - name: "add vsftpd SSL enable config"
+    lineinfile: dest=/etc/vsftpd/vsftpd.conf insertafter=EOF line="ssl_enable=YES" state=present
+
+  - name: "add vsftpd SSL disable anon config"
+    lineinfile: dest=/etc/vsftpd/vsftpd.conf insertafter=EOF line="allow_anon_ssl=NO" state=present
+
+  - name: "add vsftpd force local data ssl config"
+    lineinfile: dest=/etc/vsftpd/vsftpd.conf insertafter=EOF line="force_local_data_ssl=YES" state=present
+
+  - name: "add vsftpd force local logins ssl config"
+    lineinfile: dest=/etc/vsftpd/vsftpd.conf insertafter=EOF line="force_local_logins_ssl=YES" state=present
+
+  - name: "disable SSLv2"
+    lineinfile: dest=/etc/vsftpd/vsftpd.conf insertafter=EOF line="ssl_sslv2=NO" state=present
+
+  - name: "disable SSLv3"
+    lineinfile: dest=/etc/vsftpd/vsftpd.conf insertafter=EOF line="ssl_sslv3=NO" state=present
+
+  - name: "enable TLSv1"
+    lineinfile: dest=/etc/vsftpd/vsftpd.conf insertafter=EOF line="ssl_tlsv1=YES" state=present
+
+  - name: "diasable SSL reuse"
+    lineinfile: dest=/etc/vsftpd/vsftpd.conf insertafter=EOF line="require_ssl_reuse=NO" state=present
+
+  - name: "use high SSL ciphers"
+    lineinfile: dest=/etc/vsftpd/vsftpd.conf insertafter=EOF line="ssl_ciphers=HIGH" state=present
+
+# Set SELinux on permissive
+# 
+  - name: "Set SELinux on permissive mode"
+    selinux: policy=targeted state=permissive
+
+# Copy utility wrapper for user creation
+#
+  - name: "copy user creation utility wrapper"
+    copy: src=../files/vsftpd/addftpuser dest=/usr/local/bin/addftpuser owner=root group=root mode=0755
+
+  # - name: "Replace group in utility wrapper"
+  #   replace: dest=/usr/local/bin/addftpuser regexp="__USERGROUP__" replace={{ usergroup }}
+
+  - name: "replace homedir in utility wrapper"
+    replace: dest=/usr/local/bin/addftpuser regexp="__HOMEDIR__" replace={{ homedirs }}
+
+  - name: "ensure vsftpd starts with boot"
+    service: name=vsftpd state=restarted enabled=yes

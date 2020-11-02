@@ -1,0 +1,25 @@
+# Install meteor
+---
+- name: "Install meteor and tools to clone repos"
+  hosts: all
+  user: root
+
+  tasks:
+  - name: "install build wrapper tool prerequisites"
+    yum: name=git state=latest
+
+  - name: "install meteor"
+    shell: curl https://install.meteor.com/ | sh
+
+  # - name: "find configured home directory form {{ username }} from passwd"
+  #  shell: grep {{ username }} | cut -d":" -f 6
+  #  register: homedir
+
+  #- name: "install meteor server under user {{ username }}"
+  #  command: su -l -c " cd {{ homedir.stdout }} ; curl https://install.meteor.com/ | sh " {{ username }}
+
+  #- name: "link user installed meteor instance to shared binary folder"
+  #  file: src=/home/{{ username }}/.meteor/meteor dest=/usr/sbin/meteor state=link
+
+  #- name: "copy build_meteor_app wrapper to user {{ username }}"
+  #  copy: src=../files/meteor/meteor_build_tar.sh dest={{ homedir.stdout }}/meteor_build_tar.sh mode=0755 owner={{ username }} group={{ username }} 

@@ -1,0 +1,9 @@
+# Install nightwatchjs server
+---
+- name: "Install nightwatchjs testing framework"
+  hosts: all
+  user: root
+
+  tasks:
+  - name: "install nightwatch testing framework"
+    command: npm install -g nightwatch

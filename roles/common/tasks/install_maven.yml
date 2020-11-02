@@ -1,0 +1,21 @@
+# Install Apache Maven
+---
+- name: "Install Apache Maven"
+  hosts: all
+  user: root
+  vars:
+    maven_archive: "apache-maven-3.3.9-bin.tar.gz"
+
+  tasks:
+  - name: "Untar maven to /opt dir"
+    unarchive: dest=/opt/ src=../files/maven/{{ maven_archive }}
+
+  - name: "Find maven dir name"
+    shell: ls -d /opt/apache-maven*
+    register: maven_folder
+
+  - name: "Add {{ maven_folder.stdout }} bin folder to PATH through profile.d"
+    lineinfile: line='pathmunge {{ maven_folder.stdout }}/bin' dest=/etc/profile.d/maven_path.sh state=present create=yes
+
+  - name: "Reload profile with new PATH"
+    shell: . /etc/profile

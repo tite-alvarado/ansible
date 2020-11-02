@@ -1,0 +1,37 @@
+# Configure OpenStack Service
+---
+- name: "Configure OpenStack"
+  hosts: all
+  user: root
+  vars:
+    env_os_username: 'admin'
+    env_os_password: 'admin_pass'
+    env_os_project_name: 'admin'
+    env_os_user_domain_name: 'Default'
+    env_os_project_domain_name: 'Default'
+    env_os_auth_url: 'http://127.0.0.1:35357/v3'
+    env_os_identity_api_version: '3'
+    env_os_image_api_version: '2'
+    # Action specific vars
+    create_keystone_demo: false
+    service_project_name: 'service'
+    demo_project_name: 'demo'
+    demo_user_name: 'demo'
+    demo_user_password: 'd3mo'
+    role_name: 'user'
+
+  tasks:
+  - name: "Configure {{ env_os_username }} Account Env Vars"
+    template:
+      src: templates/openrc_env.yml.j2
+      dest: /tmp/openrc-{{ env_os_username }}
+
+  # TODO: Create desired shell openstack commands as a handler inclusion
+  - name: "Run Commands: Create openstack domain, projects, users, roles"
+    shell: ". /tmp/openrc-{{ env_os_username }} && openstack {{ item }} || true"
+    with_items:
+    - "{{ create_demo_commands }}"
+    when: create_demo_data
+
+  # - name: "Removing {{ env_os_username }} Account Env Vars"
+  #  file: name=/tmp/openrc-{{ env_os_username }} state=absent

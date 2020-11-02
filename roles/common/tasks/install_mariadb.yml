@@ -1,0 +1,42 @@
+# Install and secure mariadb
+---
+- name: "Install and secure MariaDB MySQL DB"
+  hosts: all
+  user: root
+  vars:
+    new_root_password: mariadb_pass
+    change_root_pw: false
+
+  tasks:
+  - name: "Install MariaDB"
+    yum: name={{ item }} state=latest
+    with_items:
+    - mariadb
+    - mariadb-server
+    - MySQL-python
+
+  - name: "Ensure MariaDB starts with boot"
+    service: name=mariadb state=restarted enabled=yes
+
+  - name: "Delete anonymous MySQL server user for all hosts"
+    action: mysql_user user="" host="%" state=absent
+
+  - name: "Delete anonymous MySQL server user for localhost"
+    action: mysql_user user="" state="absent"
+
+  - name: "Remove the MySQL test database"
+    action: mysql_db db=test state=absent
+
+  - name: update mysql root password for all root accounts from local servers
+    mysql_user: login_user=root 
+                name=root
+                host={{ item }}
+                password={{ new_root_password }} 
+                priv=*.*:ALL,GRANT
+    with_items:
+      # - {{ ansible_hostname }}
+      - 127.0.0.1
+      - ::1
+      - localhost
+    when: change_root_pw
+    # ignore_errors: true

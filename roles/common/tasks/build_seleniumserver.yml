@@ -1,0 +1,26 @@
+# Orchestrated recipe to build a selenium server
+#
+#  Requires new username
+---
+- name: "Configure a default selenium server"
+  hosts: all
+  user: root
+
+- include: repo_install_epel.yml
+- include: install_libselinuxpython.yml
+ 
+- include: os_create_user.yml 
+  vars: 
+    username: "{{ username }}"
+
+- include: install_vncserver.yml
+  vars: 
+    username: "{{ username }}"
+
+- include: install_openjdk.yml
+
+- include: install_selenium.yml
+  vars:
+    username: "{{ username }}"
+
+- include: reboot_and_wait.yml

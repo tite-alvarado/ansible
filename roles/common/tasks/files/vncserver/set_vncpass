@@ -1,0 +1,7 @@
+#!/usr/bin/expect
+
+set pass "123456"
+
+spawn vncpasswd
+expect "Password:" { send "$pass\r" }
+expect "Verify:" { send "$pass\r" }

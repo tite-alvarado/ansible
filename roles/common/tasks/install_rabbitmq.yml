@@ -1,0 +1,30 @@
+# Install RabbitMQ, optionally create new user
+---
+- name: "Install RabbitMQ message broker"
+  hosts: all
+  user: root
+  vars:
+    create_rmq_user: false
+    new_user_name: rabbitmq_user
+    new_user_password: rabbitmq_password
+
+  tasks:
+  - name: "Install RabbitMQ"
+    yum: name={{ item }} state=latest
+    with_items:
+    - rabbitmq-server
+
+  - name: "Ensure RabbitMQ starts with boot"
+    service: name=rabbitmq-server state=restarted enabled=yes
+
+  - name: "Find out if user {{ new_user_name }} already exists"
+    shell: rabbitmqctl list_users | grep {{ new_user_name }} || true
+    register: userExists
+
+  - name: "Create RabbitMQ user"
+    shell: rabbitmqctl add_user {{ new_user_name }} {{ new_user_password }}
+    when: create_rmq_user and (userExists.stdout == "")
+
+  # TODO: 
+  - name: "Permit configuration, read and write access for {{ new_user_name }}"
+    shell: rabbitmqctl set_permissions {{ new_user_name }} ".*" ".*" ".*"

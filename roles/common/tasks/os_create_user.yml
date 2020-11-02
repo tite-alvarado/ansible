@@ -1,0 +1,9 @@
+# Install Create Username
+---
+- name: "Create Username"
+  hosts: all
+  user: root
+
+  tasks:
+  - name: "Create Username"
+    user: name={{ username }} 

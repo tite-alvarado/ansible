@@ -1,0 +1,17 @@
+# Copy OS Images for Glance Service from external source directory
+---
+- name: "Copy OS Images for Glance Service Upload"
+  hosts: all
+  user: root
+  vars:
+    glance_image_dir: '../../ansible_etc/images'
+    glance_image_dest_dir: '/opt/glance_images/'
+
+  tasks:
+  - name: "Ensure {{ glance_image_dest_dir }} exists"
+    file: dest="{{ glance_image_dest_dir }}" state=directory
+
+  - name: "Copy OS Images in {{ glance_image_dir }}"
+    copy: src="{{ item }}" dest="{{ glance_image_dest_dir }}" owner=root group=root
+    with_fileglob:
+    - "{{ glance_image_dir }}/*"

@@ -1,0 +1,24 @@
+# Install OpenStack repository and upgrade
+---
+- name: "Install OpenStack Newton repository and upgrade"
+  hosts: all
+  user: root
+
+  tasks:
+  - name: "Install OpenStack Newton release"
+    yum: name={{ item }} state=latest
+    with_items:
+    - centos-release-openstack-newton
+    register: isOsRepoInstalled
+
+  - name: "Upgrade OS"
+    yum:
+      name: '*'
+      state: latest
+    when: "{{ isOsRepoInstalled.changed }}"
+
+  - name: "Install OpenStack utils and SELinux definitions"
+    yum: name={{ item }} state=latest
+    with_items:
+    - python-openstackclient
+    - openstack-selinux

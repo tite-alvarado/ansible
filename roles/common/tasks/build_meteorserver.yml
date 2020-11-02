@@ -1,0 +1,25 @@
+# Orchestrated recipe to build a meteor server
+#
+#  Requires new username and appname
+---
+- name: "Configure a default Meteor webserver"
+  hosts: all
+  user: root
+
+- include: repo_install_epel.yml
+- include: install_libselinuxpython.yml
+- include: install_mongodb.yml
+- include: install_nginx.yml
+- include: install_nodejsserver.yml
+- include: install_supervisor.yml
+ 
+- include: os_create_user.yml 
+  vars: 
+    username: "{{ username }}"
+
+- include: app_meteor_deploy.yml
+  vars: 
+    username: "{{ username }}"
+    app_name: "{{ app_name }}"
+    port: "{{ port }}"
+    mongo_pass: "{{ mongo_pass }}"

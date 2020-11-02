@@ -1,0 +1,24 @@
+# Install KVM
+---
+- name: "Install KVM virtualization system"
+  hosts: all
+  user: root
+
+  tasks:
+  # - name: "update kernel to latest version, dkms will install latest vbox drivers"
+  #  yum: name=kernel state=latest
+
+  - name: "install kvm"
+    yum: name={{ item }} state=latest
+    with_items:
+    - libvirt 
+    - qemu
+    - qemu-kvm
+    - qemu-img
+    - libvirt-python
+    - virt-manager
+    - virt-install
+    - virt-viewer
+
+  - name: "ensure libvirtd starts with boot"
+    service: name=libvirtd state=restarted enabled=yes

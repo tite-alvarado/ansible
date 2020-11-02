@@ -1,0 +1,14 @@
+# Orchestrated recipe to build a virtualbox server
+#
+#  Requires new username
+---
+- name: "Configure a default Virtualbox server"
+  hosts: all
+  user: root
+
+  tasks:
+  #- name: "Add virtualbox to vncserver user boot for {{ username }}"
+  #  command: su -l -c " echo '/usr/bin/VirtualBox' >> /home/{{ username }}/.vnc/xstartup" {{ username }}
+
+  - name: "Add virtualbox to gnome startup for {{ username }}"
+    copy: src=../files/vncserver/vbox.desktop dest=/home/{{ username }}/.config/autostart/

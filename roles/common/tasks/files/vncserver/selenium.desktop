@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Exec=/usr/bin/java -Dwebdriver.chrome.driver=/usr/bin/chromedriver -jar /home/__USERNAME__/selenium_rc/__SELENIUM_SERVER__
+Hidden=false
+X-GNOME-Autostart-enabled=true
+Name=SeleniumRC
+Comment=SeleniumRC Webdriver Server
+Terminal=1

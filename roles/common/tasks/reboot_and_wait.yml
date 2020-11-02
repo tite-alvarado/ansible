@@ -1,0 +1,16 @@
+# Recipe to asynchronously reboot a server and wait for its return
+#
+---
+- name: "Reboot asynchronously"
+  hosts: all
+  user: root
+
+  tasks:
+  - name: "Rebooting {{ inventory_hostname }} asynchronously"
+    shell: sleep 2 && shutdown -r now "Ansible reboot requested"
+    async: 1
+    poll: 0
+    ignore_errors: true
+
+  - name: "Waiting for {{ inventory_hostname }} to come back online"
+    local_action: wait_for host={{ inventory_hostname }} port=22 state=started timeout=300 delay=20

@@ -1,0 +1,100 @@
+# Install OpenStack Glance (Image) Service
+---
+- name: "Install Glance (Image) Service"
+  hosts: all
+  user: root
+  vars:
+    glance_db_username: 'glance'
+    glance_db_password: 'gl4nce'
+    glance_db_name: 'glance'
+    glance_admin_pass: 'glanc3'
+
+  tasks:
+  - name: "Install Glance Image Service"
+    yum: name={{ item }} state=latest
+    with_items:
+    - openstack-glance
+
+  - name: "Configure Glance DB Access"
+    ini_file:
+      backup: yes
+      path: /etc/glance/glance-api.conf
+      section: database
+      option: connection
+      value: mysql+pymysql://{{ glance_db_username}}:{{ glance_db_password }}@127.0.0.1/{{ glance_db_name }}
+
+  - name: "Configure Glance Keystone Auth"
+    ini_file:
+      path: /etc/glance/glance-api.conf
+      section: keystone_authtoken
+      option: "{{ item.key }}"
+      value: "{{ item.value }}"
+    with_items:
+      - { key: 'auth_uri', value: 'http://localhost:5000' }
+      - { key: 'auth_url', value: 'http://localhost:35357' }
+      - { key: 'memcached_servers', value: 'localhost:11211' }
+      - { key: 'auth_type',  value: 'password' }
+      - { key: 'project_domain_name', value: 'Default' }
+      - { key: 'user_domain_name', value: 'Default' }
+      - { key: 'project_name', value: 'service' }
+      - { key: 'username', value: '{{ glance_db_username }}' }
+      - { key: 'password', value: '{{ glance_admin_pass }}' }
+
+  - name: "Configure Glance Deploy Flavor"
+    ini_file:
+      path: /etc/glance/glance-api.conf
+      section: paste_deploy
+      option: flavor
+      value: keystone
+
+  - name: "Configure Glance Storage"
+    ini_file:
+      path: /etc/glance/glance-api.conf
+      section: paste_deploy
+      option: "{{ item.key }}"
+      value: "{{ item.value }}"
+    with_items:
+      - { key: 'stores', value: 'file,http' }
+      - { key: 'default_store', value: 'file' }
+      - { key: 'filesystem_store_datadir', value: '/var/lib/glance/images/' }
+
+  - name: "Configure Glance Registry DB Acces "
+    ini_file:
+      backup: yes
+      path: /etc/glance/glance-registry.conf
+      section: database
+      option: connection
+      value: mysql+pymysql://{{ glance_db_username}}:{{ glance_db_password }}@127.0.0.1/{{ glance_db_name }}
+
+  - name: "Configure Glance Registry Keystone Auth"
+    ini_file:
+      path: /etc/glance/glance-registry.conf
+      section: keystone_authtoken
+      option: "{{ item.key }}"
+      value: "{{ item.value }}"
+    with_items:
+      - { key: 'auth_uri', value: 'http://localhost:5000' }
+      - { key: 'auth_url', value: 'http://localhost:35357' }
+      - { key: 'memcached_servers', value: 'localhost:11211' }
+      - { key: 'auth_type', value: 'password' }
+      - { key: 'project_domain_name', value: 'Default' }
+      - { key: 'user_domain_name', value: 'Default' }
+      - { key: 'project_name', value: 'service' }
+      - { key: 'username', value: '{{ glance_db_username }}' }
+      - { key: 'password', value: '{{ glance_admin_pass }}' }
+
+  - name: "Configure Glance Deploy Flavor"
+    ini_file:
+      path: /etc/glance/glance-api.conf
+      section: paste_deploy
+      option: flavor
+      value: keystone
+
+  - name: "Populate Image Service DB"
+    command: su -s /bin/sh -c "glance-manage db_sync" {{ glance_db_username }}
+
+  - name: "Ensure Glance Image Service starts with boot"
+    service: name={{ item }} state=restarted enabled=yes
+    with_items:
+    - openstack-glance-api
+    - openstack-glance-registry

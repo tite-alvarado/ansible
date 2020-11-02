@@ -1,0 +1,57 @@
+# Install OpenStack Keystone (Image) Service
+---
+- name: "Install Keystone (Identity) Service"
+  hosts: all
+  user: root
+  vars:
+    keystone_db_username: 'keystone'
+    keystone_db_password: 'keyst0ne'
+    keystone_db_name: 'keystone'
+    keystone_admin_pass: 'k3ystone'
+    bootstrap_admin_pass: 'admin_pass'
+    env_bootstrap_region_id: 'RegionOne'
+
+  tasks:
+  - name: "Install Keystone (Identity) and Apache Service"
+    yum: name={{ item }} state=latest
+    with_items:
+    - openstack-keystone
+    - httpd
+    - mod_wsgi
+
+  - name: "Configure Keystone DB Access"
+    ini_file:
+      backup: yes
+      path: /etc/keystone/keystone.conf
+      section: database
+      option: connection
+      value: mysql+pymysql://{{ keystone_db_username }}:{{ keystone_db_password }}@127.0.0.1/{{ keystone_db_name }}
+
+  - name: "Configure Token Provider"
+    ini_file:
+      path: /etc/keystone/keystone.conf
+      section: token
+      option: provider
+      value: fernet
+
+  - name: "Populate Keystone ID Service DB"
+    command: su -s /bin/sh -c "keystone-manage db_sync" {{ keystone_db_username }}
+
+  - name: "Initialize Fernet key repositories"
+    command: "{{ item }}"
+    with_items:
+    - keystone-manage fernet_setup --keystone-user {{ keystone_db_username }} --keystone-group keystone 
+    - keystone-manage credential_setup --keystone-user {{ keystone_db_username }} --keystone-group keystone
+
+  - name: "Bootstrap ID service"
+    command: "{{ item }}"
+    with_items:
+    - keystone-manage bootstrap --bootstrap-password {{ bootstrap_admin_pass }} --bootstrap-admin-url http://127.0.0.1:35357/v3 --bootstrap-internal-url http://127.0.0.1:35357/v3 --bootstrap-public-url http://127.0.0.1:5000/v3/ --bootstrap-region-id {{ env_bootstrap_region_id }}
+
+  - name: "Create a link to wsgi-keystone"
+    shell: ln -fs /usr/share/keystone/wsgi-keystone.conf /etc/httpd/conf.d/
+
+  - name: "Ensure httpd starts with boot"
+    service: name={{ item }} state=restarted enabled=yes
+    with_items:
+    - httpd

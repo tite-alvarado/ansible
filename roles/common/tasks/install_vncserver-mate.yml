@@ -1,0 +1,51 @@
+# Install and configure vncserver for username
+#
+# Expects variables
+#   . username
+#   . vnc display (optional, defaults to 5 / port 5905)
+#   . vnc_password (optional, uses default)
+---
+- name: "Install and configure vncserver with gnome desktop"
+  hosts: all
+  user: root
+  vars:
+    display: 5
+    vnc_password: ch4ng3mE
+
+  tasks:
+  - name: "install vncserver"
+    yum: name={{ item }} state=latest
+    with_items:
+    - tigervnc-server
+    - mate-desktop
+    - gdm
+    # - gnome-desktop
+    # - gnome-session
+    # - gnome-screensaver
+
+  - name: "create configuration folder"
+    file: path=/home/{{ username }}/.vnc/ state=directory owner={{ username }} group={{ username }}
+
+  - name: "set vnc passwd for {{ username }}"
+    shell: su -l -c 'cd /home/{{ username }}/.vnc/ && echo {{ vnc_password }} | vncpasswd -f > ./passwd ' {{ username }}
+
+  - name: "set vncpasswd file attributes"
+    shell: su -l -c 'cd /home/{{ username }}/.vnc/ && chown {{ username }}.{{ username }} ./passwd && chmod 600 ./passwd' {{ username }}
+
+  - name: "copy configuration"
+    copy: src=../files/vncserver/xstartup.mate.skel dest=/home/{{ username }}/.vnc/xstartup mode=0755 owner={{ username }} group={{ username }}
+
+  - name: "copy service configuration"
+    copy: src=../files/vncserver/vncserver@.service dest=/etc/systemd/system/vncserver@.service
+
+  - name: "bind vnc server to {{ username }} user"
+    replace: dest=/etc/systemd/system/vncserver@.service regexp='__USERNAME__' replace={{ username }}
+
+  - name: "reload systemd"
+    command: systemctl daemon-reload
+
+  - name: "load vncserver to systemd as display {{ display }}"
+    command: systemctl enable vncserver@:{{ display }}.service
+
+  - name: "ensure vncservice starts with boot"
+    service: name=vncserver@:{{ display }}.service state=restarted enabled=yes

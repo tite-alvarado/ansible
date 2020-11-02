@@ -1,0 +1,18 @@
+# Install Virtualbox from vbox repo
+---
+- name: "Install virtualbox virtualization system"
+  hosts: all
+  user: root
+
+  tasks:
+  - name: "copy virtualbox repository"
+    copy: src=../files/virtualbox.repo dest=/etc/yum.repos.d/virtualbox.repo owner=root group=root
+
+  - name: "update kernel to latest version, dkms will install latest vbox drivers"
+    yum: name=kernel state=latest
+
+  - name: "install virtualbox"
+    yum: name={{ item }} state=latest
+    with_items:
+    - dkms
+    - VirtualBox-5.0
